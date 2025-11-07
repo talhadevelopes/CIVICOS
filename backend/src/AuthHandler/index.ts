@@ -98,6 +98,7 @@ authHandler.post("/login", async (req, res) => {
     const mlas = await prisma.mLA.findMany({ where: { constituency } });
     const orgs = await prisma.organization.findMany({ where: { constituency } });
 
+    
     await prisma.citizen.update({
       where: { id: citizen.id },
       data: {
@@ -114,13 +115,15 @@ authHandler.post("/login", async (req, res) => {
         role: "citizen",
       },
       JWT_SECRET!,
-      { expiresIn: "7d" } 
+      { expiresIn: "7d" }
     );
 
+    
     return res.status(200).json({
       message: "Login successful",
       token,
       citizen: {
+        id: citizen.id, 
         email: citizen.email,
         constituency,
         linked_MLAs: mlas.map((m) => m.name),
@@ -132,3 +135,4 @@ authHandler.post("/login", async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 });
+

@@ -35,10 +35,10 @@ model Issue {
   mediaUrl        String?
   location        String
   status          IssueStatus   @default(PENDING)
-  severity        Severity      @default(LOW)  // 🔥 Added severity field
-
+  severity        Severity      @default(LOW)  
   citizenId       String
-  citizen         Citizen       @relation(fields: [citizenId], references: [id])
+  citizen         Citizen @relation(fields: [citizenId], references: [id], onDelete: Cascade)
+
 
   mlaId           String?
   mla             MLA?          @relation(fields: [mlaId], references: [id])
@@ -62,6 +62,7 @@ model Citizen {
   updatedAt            DateTime         @updatedAt
 }
 
+
 model MLA {
   id                   String     @id @default(uuid())
   name                 String
@@ -70,15 +71,30 @@ model MLA {
   email                String?    @unique
   phone                String?
   image                String?
+
+  
+  criminalCasesCount   Int?
+  education            String?
+  totalAssetsInRupees  Float?
+  liabilitiesInRupees  Float?
+  electionYear         Int?
+  dataSource           String?
+  mockHistory          String?
+
+  
   citizens             Citizen[]  @relation("CitizenMLAs")
   issues               Issue[]
 
+  
   totalComplaints      Int        @default(0)
   resolvedComplaints   Int        @default(0)
   rating               Float?
+
+  
   createdAt            DateTime   @default(now())
-  updatedAt            DateTime   @updatedAt
+  updatedAt            DateTime   @default(now())
 }
+
 
 model Organization {
   id                String     @id @default(uuid())

@@ -39,7 +39,7 @@ exports.citizenHandler.get("/details", (req, res) => __awaiter(void 0, void 0, v
                 id: citizen.id,
                 name: citizen.name,
                 email: citizen.email,
-                constituency: "Khairtabad", // (for now hardcoded)
+                constituency: "Khairtabad",
                 linked_MLAs: citizen.linked_MLAs.map((mla) => ({
                     id: mla.id,
                     name: mla.name,
@@ -62,5 +62,74 @@ exports.citizenHandler.get("/details", (req, res) => __awaiter(void 0, void 0, v
     catch (error) {
         console.error(error);
         res.status(500).json({ message: "Internal server error" });
+    }
+}));
+exports.citizenHandler.post("/issue", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { update, issueId, title, description, category, mediaUrl, location, citizenId, mlaId, organizationId, status, severity, } = req.body;
+    try {
+        if (update) {
+            if (!issueId || !status) {
+                return res
+                    .status(400)
+                    .json({ message: "issueId and status are required for update" });
+            }
+            const existingIssue = yield prisma.issue.findUnique({
+                where: { id: issueId },
+            });
+            if (!existingIssue) {
+                return res.status(404).json({ message: "Issue not found" });
+            }
+            const updatedIssue = yield prisma.issue.update({
+                where: { id: issueId },
+                data: Object.assign(Object.assign({ status }, (severity && { severity })), { updatedAt: new Date() }),
+            });
+            return res.status(200).json({
+                message: "Issue updated successfully",
+                issue: updatedIssue,
+            });
+        }
+        if (!title || !description || !category || !location || !citizenId) {
+            return res.status(400).json({
+                message: "title, description, category, location, and citizenId are required",
+            });
+        }
+        const citizenExists = yield prisma.citizen.findUnique({ where: { id: citizenId } });
+        if (!citizenExists) {
+            return res.status(400).json({ message: "Invalid citizenId — Citizen not found" });
+        }
+        if (mlaId) {
+            const mlaExists = yield prisma.mLA.findUnique({ where: { id: mlaId } });
+            if (!mlaExists) {
+                return res.status(400).json({ message: "Invalid mlaId — MLA not found" });
+            }
+        }
+        if (organizationId) {
+            const orgExists = yield prisma.organization.findUnique({ where: { id: organizationId } });
+            if (!orgExists) {
+                return res.status(400).json({ message: "Invalid organizationId — Organization not found" });
+            }
+        }
+        const newIssue = yield prisma.issue.create({
+            data: {
+                title,
+                description,
+                category,
+                mediaUrl,
+                location,
+                status: "PENDING",
+                severity: severity || "LOW",
+                citizenId,
+                mlaId,
+                organizationId,
+            },
+        });
+        return res.status(201).json({
+            message: "Issue created successfully",
+            issue: newIssue,
+        });
+    }
+    catch (error) {
+        console.error("Error handling issue:", error);
+        return res.status(500).json({ message: "Internal server error" });
     }
 }));

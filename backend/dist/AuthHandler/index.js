@@ -108,6 +108,7 @@ exports.authHandler.post("/login", (req, res) => __awaiter(void 0, void 0, void 
             message: "Login successful",
             token,
             citizen: {
+                id: citizen.id,
                 email: citizen.email,
                 constituency,
                 linked_MLAs: mlas.map((m) => m.name),
