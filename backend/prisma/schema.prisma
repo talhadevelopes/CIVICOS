@@ -3,10 +3,14 @@ generator client {
   provider = "prisma-client-js"
 }
 
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+
+
 enum IssueStatus {
   PENDING
   IN_PROGRESS
@@ -14,72 +18,81 @@ enum IssueStatus {
   FIXED
 }
 
+enum Severity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+
+
 model Issue {
-  id              String      @id @default(cuid())
+  id              String        @id @default(cuid())
   title           String
   description     String
   category        String
   mediaUrl        String?
   location        String
-  status          IssueStatus @default(PENDING)
+  status          IssueStatus   @default(PENDING)
+  severity        Severity      @default(LOW)  // 🔥 Added severity field
 
-  
   citizenId       String
-  citizen         Citizen      @relation(fields: [citizenId], references: [id])
+  citizen         Citizen       @relation(fields: [citizenId], references: [id])
 
-  mlaId           String?      
-  mla             MLA?         @relation(fields: [mlaId], references: [id])
+  mlaId           String?
+  mla             MLA?          @relation(fields: [mlaId], references: [id])
 
-  organizationId  String?      
+  organizationId  String?
   organization    Organization? @relation(fields: [organizationId], references: [id])
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 }
 
 model Citizen {
-  id                   String   @id @default(uuid())
+  id                   String           @id @default(uuid())
   name                 String
-  email                String   @unique
+  email                String           @unique
   password             String
-  linked_MLAs          MLA[]           @relation("CitizenMLAs")
-  linked_Organizations Organization[]  @relation("CitizenOrganizations")
+  linked_MLAs          MLA[]            @relation("CitizenMLAs")
+  linked_Organizations Organization[]   @relation("CitizenOrganizations")
   issues               Issue[]
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
 }
 
 model MLA {
-  id                   String    @id @default(uuid())
+  id                   String     @id @default(uuid())
   name                 String
-  constituency         String    @default("Khairtabad")
+  constituency         String     @default("Khairtabad")
   party                String?
-  email                String?   @unique
+  email                String?    @unique
   phone                String?
   image                String?
-  citizens             Citizen[] @relation("CitizenMLAs")
-  issues               Issue[]   
+  citizens             Citizen[]  @relation("CitizenMLAs")
+  issues               Issue[]
 
-  totalComplaints      Int     @default(0)
-  resolvedComplaints   Int     @default(0)
+  totalComplaints      Int        @default(0)
+  resolvedComplaints   Int        @default(0)
   rating               Float?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
 }
 
 model Organization {
-  id                String    @id @default(uuid())
+  id                String     @id @default(uuid())
   name              String
   category          String
-  constituency      String    @default("Khairtabad")
-  contact_email     String?   @unique
+  constituency      String     @default("Khairtabad")
+  contact_email     String?    @unique
   contact_phone     String?
   address           String?
-  citizens          Citizen[] @relation("CitizenOrganizations")
-  issues            Issue[]   
+  citizens          Citizen[]  @relation("CitizenOrganizations")
+  issues            Issue[]
 
-  totalComplaints    Int     @default(0)
-  resolvedComplaints Int     @default(0)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  totalComplaints    Int        @default(0)
+  resolvedComplaints Int        @default(0)
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
 }
