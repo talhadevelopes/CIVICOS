@@ -1,1 +1,1 @@
-{"root":["./src/index.ts","./src/authhandler/index.ts"],"version":"5.8.3"}
+{"root":["./src/index.ts","./src/authhandler/index.ts","./src/citizenhandler/index.ts"],"version":"5.8.3"}
