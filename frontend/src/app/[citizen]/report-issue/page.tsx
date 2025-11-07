@@ -1,9 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Upload, CheckCircle, Loader2, AlertCircle } from "lucide-react"
+import { useUserDetails } from "@/lib/cache/index"
 
 export default function ReportIssue() {
+  const [email, setEmail] = useState<string>("")
+  const { data: user, isLoading: isLoadingUser } = useUserDetails(email)
+
   const [formData, setFormData] = useState({
     title: "",
     category: "",
@@ -21,6 +25,14 @@ export default function ReportIssue() {
   const [uploadError, setUploadError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+
+  // Load user email from localStorage
+  useEffect(() => {
+    const storedEmail = localStorage.getItem("email")
+    if (storedEmail) {
+      setEmail(storedEmail)
+    }
+  }, [])
 
   const categories = [
     "Road Damage",
@@ -153,14 +165,18 @@ export default function ReportIssue() {
         return
       }
 
+      // Get MLA ID from cached user data
+      const mlaId = user?.currentMLA?.id || user?.mlaId
+
       // Prepare issue data matching backend route structure
       const issueData = {
         title: formData.title,
         description: formData.description,
         category: formData.category,
         location: formData.location,
-        severity: formData.severity, // Already matches enum: LOW, MEDIUM, HIGH, CRITICAL
+        severity: formData.severity,
         citizenId: citizenId,
+        ...(mlaId && { mlaId: mlaId }), // ✅ Include MLA ID from cached data
         ...(uploadedImageUrl && { mediaUrl: uploadedImageUrl }),
         ...(coordinates?.latitude && { latitude: coordinates.latitude }),
         ...(coordinates?.longitude && { longitude: coordinates.longitude }),
@@ -188,7 +204,7 @@ export default function ReportIssue() {
 
       // Redirect to dashboard after 2 seconds
       setTimeout(() => {
-        window.location.href = "/dashboard"
+        window.location.href = "/citizen/dashboard"
       }, 2000)
 
     } catch (error: any) {
@@ -198,6 +214,18 @@ export default function ReportIssue() {
     }
   }
 
+  // Show loading state while fetching user data
+  if (isLoadingUser || !email) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading your profile...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-linear-to-br from-blue-50 to-indigo-50 py-12 px-4">
       <div className="max-w-2xl mx-auto">
@@ -205,6 +233,11 @@ export default function ReportIssue() {
           <div className="mb-8 text-center">
             <h1 className="text-4xl font-bold mb-2 text-gray-900">Report an Issue</h1>
             <p className="text-gray-600">Help improve your city by reporting civic issues</p>
+            {user?.currentMLA && (
+              <p className="text-sm text-blue-600 mt-2">
+                📍 Your MLA: {user.currentMLA.name} ({user.constituency})
+              </p>
+            )}
           </div>
 
           {submitted ? (
@@ -214,7 +247,7 @@ export default function ReportIssue() {
                 Issue Reported Successfully
               </h2>
               <p className="text-green-700 mb-4">
-                Your report has been submitted. Authorities will review and take action soon.
+                Your report has been submitted to {user?.currentMLA?.name || "your MLA"}. Authorities will review and take action soon.
               </p>
               {uploadedImageUrl && (
                 <div className="bg-white rounded p-3 mb-4">
