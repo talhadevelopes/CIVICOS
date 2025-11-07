@@ -159,12 +159,14 @@ export default function ReportIssue() {
         description: formData.description,
         category: formData.category,
         location: formData.location,
-        severity: formData.severity,
+        severity: formData.severity, // Already matches enum: LOW, MEDIUM, HIGH, CRITICAL
         citizenId: citizenId,
         ...(uploadedImageUrl && { mediaUrl: uploadedImageUrl }),
         ...(coordinates?.latitude && { latitude: coordinates.latitude }),
         ...(coordinates?.longitude && { longitude: coordinates.longitude }),
       }
+
+      console.log("Submitting issue data:", issueData)
 
       // Submit to backend
       const response = await fetch("https://civiciobackend.vercel.app/api/v1/citizen/issue", {

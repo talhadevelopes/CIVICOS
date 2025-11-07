@@ -17,7 +17,12 @@ citizenHandler.get("/details", async (req, res) => {
     const citizen = await prisma.citizen.findUnique({
       where: { email: String(email) },
       include: {
-        linked_MLAs: true,
+        linked_MLAs: {
+          orderBy: {
+            createdAt: 'desc' // ✅ Most recent MLA first
+          },
+          take: 1 // ✅ Only get the most recent one
+        },
         linked_Organizations: true,
         issues: {
           include: {
@@ -35,24 +40,29 @@ citizenHandler.get("/details", async (req, res) => {
       return res.status(404).json({ message: "Citizen not found" });
     }
 
+    const mostRecentMLA = citizen.linked_MLAs[0] || null; 
+
     return res.status(200).json({
       citizen: {
         id: citizen.id,
         name: citizen.name,
         email: citizen.email,
         constituency: citizen.constituency,
-        linked_MLAs: citizen.linked_MLAs.map((mla) => ({
-          id: mla.id,
-          name: mla.name,
-          party: mla.party,
-          email: mla.email,
-          phone: mla.phone,
-          rating: mla.rating,
-        })),
+        mlaId: mostRecentMLA?.id || null, 
+        currentMLA: mostRecentMLA ? {
+          id: mostRecentMLA.id,
+          name: mostRecentMLA.name,
+          party: mostRecentMLA.party,
+          email: mostRecentMLA.email,
+          phone: mostRecentMLA.phone,
+          constituency: mostRecentMLA.constituency,
+          rating: mostRecentMLA.rating,
+        } : null,
         linked_Organizations: citizen.linked_Organizations.map((org) => ({
           id: org.id,
           name: org.name,
           category: org.category,
+          constituency: org.constituency,
           contact_email: org.contact_email,
           contact_phone: org.contact_phone,
           address: org.address,
@@ -68,97 +78,32 @@ citizenHandler.get("/details", async (req, res) => {
           severity: issue.severity,
           createdAt: issue.createdAt,
           updatedAt: issue.updatedAt,
+          mlaId: issue.mlaId,
+          organizationId: issue.organizationId,
           mla: issue.mla ? {
             id: issue.mla.id,
             name: issue.mla.name,
             party: issue.mla.party,
+            constituency: issue.mla.constituency,
           } : null,
           organization: issue.organization ? {
             id: issue.organization.id,
             name: issue.organization.name,
             category: issue.organization.category,
+            constituency: issue.organization.constituency,
           } : null,
         })),
       },
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Internal server error" });
+    console.error("Error fetching citizen details:", error);
+    res.status(500).json({ 
+      message: "Internal server error",
+      error: process.env.NODE_ENV === 'development' ? "something went wrong" : undefined
+    });
   }
 });
 
-
-
-// citizenHandler.get("/details", async (req, res) => {
-//   const { email } = req.query
-
-//   if (!email) {
-//     return res.status(400).json({ message: "Email is required" })
-//   }
-
-//   try {
-//     const citizen = await prisma.citizen.findUnique({
-//       where: { email: String(email) },
-//       include: {
-//         linked_MLAs: true,
-//         linked_Organizations: true,
-//         issues: true, 
-//       },
-//     })
-
-//     if (!citizen) {
-//       return res.status(404).json({ message: "Citizen not found" })
-//     }
-
-//     return res.status(200).json({
-//       citizen: {
-//         id: citizen.id,
-//         name: citizen.name,
-//         email: citizen.email,
-//         constituency: citizen.constituency || "Khairtabad",
-
-//         linked_MLAs: citizen.linked_MLAs.map((mla) => ({
-//           id: mla.id,
-//           name: mla.name,
-//           party: mla.party,
-//           email: mla.email,
-//           phone: mla.phone,
-//           rating: mla.rating,
-//         })),
-
-//         linked_Organizations: citizen.linked_Organizations.map((org) => ({
-//           id: org.id,
-//           name: org.name,
-//           category: org.category,
-//           contact_email: org.contact_email,
-//           contact_phone: org.contact_phone,
-//           address: org.address,
-//         })),
-
-//         issues: (citizen.issues || []).map((issue) => ({
-//           id: issue.id,
-//           title: issue.title,
-//           description: issue.description,
-//           category: issue.category,
-//           mediaUrl: issue.mediaUrl,
-//           location: issue.location,
-//           status: issue.status,
-//           severity: issue.severity,
-//           citizenId: issue.citizenId,
-//           mlaId: issue.mlaId,
-//           organizationId: issue.organizationId,
-//           createdAt: issue.createdAt,
-//           updatedAt: issue.updatedAt,
-//         })),
-//       },
-//     })
-//   } catch (error) {
-//     console.error(error)
-//     return res.status(500).json({ message: "Internal server error" })
-//   }
-// })
-
-// export default citizenHandler
 
 
 
@@ -179,7 +124,7 @@ citizenHandler.post("/issue", async (req, res) => {
     status,
     severity,
   } = req.body;
-
+  
   try {
     // --- Update existing issue ---
     if (update) {
@@ -188,55 +133,55 @@ citizenHandler.post("/issue", async (req, res) => {
           .status(400)
           .json({ message: "issueId and status are required for update" });
       }
-
+      
       const existingIssue = await prisma.issue.findUnique({ where: { id: issueId } });
       if (!existingIssue) {
         return res.status(404).json({ message: "Issue not found" });
       }
-
+      
       const updatedIssue = await prisma.issue.update({
         where: { id: issueId },
         data: {
-          status,
-          ...(severity && { severity }),
+          status: status as any, // Cast to enum
+          ...(severity && { severity: severity as any }), // Cast to enum
           ...(latitude && { latitude }),
           ...(longitude && { longitude }),
           updatedAt: new Date(),
         },
       });
-
+      
       return res.status(200).json({
         message: "Issue updated successfully",
         issue: updatedIssue,
       });
     }
-
+    
     // --- Create new issue ---
     if (!title || !description || !category || !location || !citizenId) {
       return res.status(400).json({
         message: "title, description, category, location, and citizenId are required",
       });
     }
-
+    
     const citizenExists = await prisma.citizen.findUnique({ where: { id: citizenId } });
     if (!citizenExists) {
       return res.status(400).json({ message: "Invalid citizenId — Citizen not found" });
     }
-
+    
     if (mlaId) {
       const mlaExists = await prisma.mLA.findUnique({ where: { id: mlaId } });
       if (!mlaExists) {
         return res.status(400).json({ message: "Invalid mlaId — MLA not found" });
       }
     }
-
+    
     if (organizationId) {
       const orgExists = await prisma.organization.findUnique({ where: { id: organizationId } });
       if (!orgExists) {
         return res.status(400).json({ message: "Invalid organizationId — Organization not found" });
       }
     }
-
+    
     const newIssue = await prisma.issue.create({
       data: {
         title,
@@ -244,23 +189,77 @@ citizenHandler.post("/issue", async (req, res) => {
         category,
         mediaUrl,
         location,
-        ...(latitude && { latitude }),
-        ...(longitude && { longitude }),
-        status: "PENDING",
-        severity: severity || "LOW",
+        ...(latitude && { latitude: parseFloat(latitude) }),
+        ...(longitude && { longitude: parseFloat(longitude) }),
+        status: "PENDING", // This will use the enum value
+        severity: (severity || "LOW") as any, // Cast to enum type
         citizenId,
-        mlaId,
-        organizationId,
+        ...(mlaId && { mlaId }),
+        ...(organizationId && { organizationId }),
       },
     });
-
+    
     return res.status(201).json({
       message: "Issue created successfully",
       issue: newIssue,
     });
   } catch (error) {
     console.error("Error handling issue:", error);
-    return res.status(500).json({ message: "Internal server error" });
+    console.error("Error details:", error);
+    return res.status(500).json({ 
+      message: "Internal server error",
+      error: process.env.NODE_ENV === 'development' ? "something went wrong" : undefined
+    });
+  }
+});
+
+citizenHandler.get("/all", async (req, res) => {
+  try {
+    const issues = await prisma.issue.findMany({
+      include: {
+        citizen: {
+          select: {
+            id: true,
+            name: true,
+            constituency: true,
+          },
+        },
+        mla: {
+          select: {
+            id: true,
+            name: true,
+            party: true,
+            constituency: true,
+          },
+        },
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            category: true,
+            constituency: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc', // Most recent first
+      },
+    });
+
+    return res.status(200).json({ 
+      success: true,
+      count: issues.length,
+      issues 
+    });
+  } catch (error) {
+    console.error("Error fetching issues:", error);
+    console.error("Error message:", error);
+    console.error("Error stack:", error);
+    
+    return res.status(500).json({ 
+      message: "Internal server error",
+      error: process.env.NODE_ENV === 'development' ? error : undefined
+    });
   }
 });
 
