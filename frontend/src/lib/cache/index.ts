@@ -41,6 +41,8 @@ export interface Issue {
 }
 
 export interface Citizen {
+  aqi: number;
+  emergencies: never[];
   id: string;
   name: string;
   email: string;
